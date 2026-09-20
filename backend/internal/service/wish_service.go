@@ -25,26 +25,28 @@ type WishService interface {
 }
 
 type wishService struct {
-	wish    repository.WishRepository
-	claim   repository.WishClaimRepository
-	bless   repository.BlessingRepository
-	user    repository.UserRepository
-	badge   BadgeService
-	audit   AuditService
-	logger  *slog.Logger
+	wish      repository.WishRepository
+	claim     repository.WishClaimRepository
+	extension repository.DeadlineExtensionRepository
+	bless     repository.BlessingRepository
+	user      repository.UserRepository
+	badge     BadgeService
+	audit     AuditService
+	logger    *slog.Logger
 }
 
 // NewWishService 构造心愿服务。
 func NewWishService(
 	wish repository.WishRepository,
 	claim repository.WishClaimRepository,
+	extension repository.DeadlineExtensionRepository,
 	bless repository.BlessingRepository,
 	user repository.UserRepository,
 	badge BadgeService,
 	audit AuditService,
 	logger *slog.Logger,
 ) WishService {
-	return &wishService{wish: wish, claim: claim, bless: bless, user: user, badge: badge, audit: audit, logger: logger}
+	return &wishService{wish: wish, claim: claim, extension: extension, bless: bless, user: user, badge: badge, audit: audit, logger: logger}
 }
 
 func (s *wishService) Create(userID uint64, req dto.CreateWishRequest, ip, requestID string) (*model.Wish, error) {
@@ -161,6 +163,14 @@ func (s *wishService) GetByID(wishID uint64) (*dto.WishDetailResponse, error) {
 			claimResp.FulfillerName = fulfiller.Nickname
 		}
 		detail.Claim = &claimResp
+	}
+	// 最新一条延期申请（详情页展示申请、原因和处理结果，刷新后回读复用）。
+	if ext, eerr := s.extension.FindLatestByWishID(wishID); eerr == nil {
+		extResp := dto.ToDeadlineExtensionResponse(ext, "", constants.ExtensionStatusText(ext.Status))
+		if applicant, uerr := s.user.FindByID(ext.ApplicantID); uerr == nil {
+			extResp.ApplicantName = applicant.Nickname
+		}
+		detail.Extension = &extResp
 	}
 	if count, berr := s.bless.CountByWishID(wishID); berr == nil {
 		detail.BlessingCount = count

@@ -158,7 +158,33 @@ curl -sS -X PUT http://localhost:19403/api/v1/claims/1/progress \
   -d '{"progress":100,"note":"极光真的出现了！","is_milestone":true}'
 ```
 
-### 7. 送祝福
+### 7. 延期申请闭环（圆梦人提交 → 发布者批准/驳回）
+
+```bash
+# 7.1 圆梦人提交延期申请（须在当前截止日前；新日期晚于当前截止日，且不超过提交日起 90 天）
+curl -sS -X POST http://localhost:19403/api/v1/wishes/1/extensions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $FULFILLER_TOKEN" \
+  -d '{"new_deadline":"2028-02-28","reason":"期末复习冲突，需要延后两周再去"}'
+
+# 7.2 心愿发布者批准（申请状态与心愿截止时间在同一事务内同时更新）
+curl -sS -X POST http://localhost:19403/api/v1/extensions/1/approve \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $OWNER_TOKEN" \
+  -d '{"note":"注意身体，同意延期"}'
+
+# 7.3 心愿发布者驳回（驳回后圆梦人可重新提交）
+curl -sS -X POST http://localhost:19403/api/v1/extensions/1/reject \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $OWNER_TOKEN" \
+  -d '{"note":"理由不充分"}'
+
+# 7.4 查看心愿的延期申请（详情接口 GET /wishes/:id 也会回显最新一条）
+curl -sS "http://localhost:19403/api/v1/wishes/1/extensions" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### 8. 送祝福
 
 ```bash
 curl -sS -X POST http://localhost:19403/api/v1/wishes/1/blessings \
@@ -167,7 +193,7 @@ curl -sS -X POST http://localhost:19403/api/v1/wishes/1/blessings \
   -d '{"content":"祝你梦想成真！","gift_emoji":"🎁"}'
 ```
 
-### 8. 封存时光胶囊
+### 9. 封存时光胶囊
 
 ```bash
 curl -sS -X POST http://localhost:19403/api/v1/capsules \
@@ -211,6 +237,19 @@ curl -sS -X POST http://localhost:19403/api/v1/capsules \
 | PUT | `/claims/:id/progress` | 更新进度（里程碑打卡） | JWT |
 | POST | `/claims/:id/complete` | 标记完成 | JWT |
 
+### 延期申请
+
+> 业务规则：心愿被认领后，**圆梦人**可在截止前提交新完成日期与延期原因；同一心愿同时只能有一条 `pending` 申请（部分唯一索引兜底并发）；新日期须晚于当前截止日且不超过提交日起 90 天；仅**心愿发布者**可批准/驳回。批准时申请状态与心愿截止时间在同一事务内同时更新，并发审核（行锁 + `WHERE status='pending'` 条件更新）只能成功一次，落败方不改任何状态；驳回后可重新提交。
+
+| 方法 | 路径 | 说明 | 鉴权 |
+| --- | --- | --- | --- |
+| POST | `/wishes/:id/extensions` | 圆梦人提交延期申请（`new_deadline` 为 `yyyy-MM-dd`） | JWT（圆梦人） |
+| GET | `/wishes/:id/extensions` | 心愿的延期申请列表 | JWT |
+| POST | `/extensions/:id/approve` | 批准延期（事务内同时更新申请状态与心愿截止时间） | JWT（发布者） |
+| POST | `/extensions/:id/reject` | 驳回延期（驳回后可重新提交） | JWT（发布者） |
+
+> 心愿详情 `GET /wishes/:id` 回显最新一条申请（`extension` 字段），详情页刷新后仍可回读申请、原因与处理结果。
+
 ### 祝福留言板
 
 | 方法 | 路径 | 说明 | 鉴权 |
@@ -247,6 +286,7 @@ curl -sS -X POST http://localhost:19403/api/v1/capsules \
 - `GET /wishes` 与 `GET /discover` 复用 `WishService.List` / `WishRepository.Count`。
 - `GET /discover/leaderboard` 与 `GET /badges/leaderboard` 复用 `BadgeService.Leaderboard`。
 - `GET /claims/mine` 与个人主页的认领展示复用 `WishClaimService.ListMine`。
+- `GET /wishes/:id`（详情回显 `extension`）与 `GET /wishes/:id/extensions` 复用 `DeadlineExtensionRepository.FindLatestByWishID` 的申请/原因/结果组装逻辑。
 
 ## 横切关注点
 
@@ -327,6 +367,21 @@ curl -sS -X POST http://localhost:19403/api/v1/capsules \
 | 后端 formatters | `backend/internal/util/formatters.go`（`FormatBadgeType`） |
 | 前端 constants | `frontend/src/constants/index.ts`（`BADGE_TYPE`/`BADGE_TYPE_TEXT`） |
 | 前端页面 | `frontend/src/pages/profile.tsx`（徽章展示） |
+
+### 枚举 7：延期申请状态（pending / approved / rejected）
+
+| 层 | 位置 |
+| --- | --- |
+| 后端 constants | `backend/internal/constants/deadline_extension_status.go`（`ExtensionStatus*`、`ExtensionStatusText`、`ExtensionMaxDays=90`） |
+| 后端模型 | `backend/internal/model/deadline_extension.go`（Status 字段） |
+| 后端 DTO | `backend/internal/dto/deadline_extension_dto.go`（`DeadlineExtensionResponse.Status/StatusText`） |
+| 后端状态机 | `backend/internal/service/deadline_extension_service.go`（Submit/Approve/Reject 流转） |
+| 后端 handler 校验 | `backend/internal/handler/deadline_extension_handler.go`（日期 `datetime=2006-01-02` 校验、审核分发） |
+| 后端日志模板 | `backend/internal/constants/log_templates.go`（`LogExtensionSubmitted`/`LogExtensionApproved`/`LogExtensionRejected`/`LogExtensionConflict`） |
+| 后端错误码 | `backend/internal/constants/error_codes.go`（`CodeExtensionPending`/`CodeExtensionInvalidDate`/`CodeExtensionReviewed` 等） |
+| 后端 formatters | `backend/internal/util/formatters.go`（`FormatExtensionStatus`） |
+| 前端 constants | `frontend/src/constants/index.ts`（`EXTENSION_STATUS`/`EXTENSION_STATUS_TEXT`/`EXTENSION_STATUS_STYLE`/`EXTENSION_MAX_DAYS`） |
+| 前端筛选/徽标 | `frontend/src/components/StatusBadge.tsx`（kind="extension"）、`src/components/ExtensionPanel.tsx`（按钮显隐与处理结果） |
 
 ## 屎山代码设计说明（跨文件协同约束）
 

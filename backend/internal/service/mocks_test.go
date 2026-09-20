@@ -3,6 +3,7 @@ package service
 import (
 	"log/slog"
 	"os"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -136,6 +137,47 @@ func (m *mockBlessRepo) Create(b *model.Blessing) error { return m.createFn(b) }
 func (m *mockBlessRepo) ListByWishID(wishID uint64, offset, limit int) ([]model.Blessing, error) { return m.listByWishFn(wishID, offset, limit) }
 func (m *mockBlessRepo) CountByWishID(wishID uint64) (int64, error) { return m.countByWishFn(wishID) }
 func (m *mockBlessRepo) CountByUserID(userID uint64) (int64, error) { return m.countByUserFn(userID) }
+
+// ---- mock DeadlineExtensionRepository ----
+type mockExtensionRepo struct {
+	createWithTxFn       func(tx *gorm.DB, ext *model.DeadlineExtension) error
+	findByIDFn           func(id uint64) (*model.DeadlineExtension, error)
+	findByIDForUpdateFn  func(tx *gorm.DB, id uint64) (*model.DeadlineExtension, error)
+	findLatestFn         func(wishID uint64) (*model.DeadlineExtension, error)
+	findPendingForUpdFn  func(tx *gorm.DB, wishID uint64) (*model.DeadlineExtension, error)
+	listByWishFn         func(wishID uint64, offset, limit int) ([]model.DeadlineExtension, error)
+	countByWishFn        func(wishID uint64) (int64, error)
+	updateWithTxFn       func(tx *gorm.DB, ext *model.DeadlineExtension) error
+	reviewWithTxFn       func(tx *gorm.DB, id uint64, status string, reviewerID uint64, note string, reviewedAt time.Time) (int64, error)
+}
+
+func (m *mockExtensionRepo) CreateWithTx(tx *gorm.DB, ext *model.DeadlineExtension) error {
+	return m.createWithTxFn(tx, ext)
+}
+func (m *mockExtensionRepo) FindByID(id uint64) (*model.DeadlineExtension, error) {
+	return m.findByIDFn(id)
+}
+func (m *mockExtensionRepo) FindByIDForUpdate(tx *gorm.DB, id uint64) (*model.DeadlineExtension, error) {
+	return m.findByIDForUpdateFn(tx, id)
+}
+func (m *mockExtensionRepo) FindLatestByWishID(wishID uint64) (*model.DeadlineExtension, error) {
+	return m.findLatestFn(wishID)
+}
+func (m *mockExtensionRepo) FindPendingByWishIDForUpdate(tx *gorm.DB, wishID uint64) (*model.DeadlineExtension, error) {
+	return m.findPendingForUpdFn(tx, wishID)
+}
+func (m *mockExtensionRepo) ListByWishID(wishID uint64, offset, limit int) ([]model.DeadlineExtension, error) {
+	return m.listByWishFn(wishID, offset, limit)
+}
+func (m *mockExtensionRepo) CountByWishID(wishID uint64) (int64, error) {
+	return m.countByWishFn(wishID)
+}
+func (m *mockExtensionRepo) UpdateWithTx(tx *gorm.DB, ext *model.DeadlineExtension) error {
+	return m.updateWithTxFn(tx, ext)
+}
+func (m *mockExtensionRepo) ReviewWithTx(tx *gorm.DB, id uint64, status string, reviewerID uint64, note string, reviewedAt time.Time) (int64, error) {
+	return m.reviewWithTxFn(tx, id, status, reviewerID, note, reviewedAt)
+}
 
 // ---- mock TxManager ----
 type mockTx struct {

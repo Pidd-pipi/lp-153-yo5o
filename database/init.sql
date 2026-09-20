@@ -1,4 +1,3 @@
--- wishwall 数据库初始化脚本（GORM AutoMigrate 为实际执行方，本脚本供人工参考/审计）
 CREATE TABLE IF NOT EXISTS users (
     id            BIGSERIAL PRIMARY KEY,
     username      VARCHAR(50)  NOT NULL UNIQUE,
@@ -97,3 +96,25 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_request ON audit_logs(request_id);
+
+CREATE TABLE IF NOT EXISTS deadline_extensions (
+    id               BIGSERIAL PRIMARY KEY,
+    wish_id          BIGINT NOT NULL REFERENCES wishes(id),
+    claim_id         BIGINT NOT NULL REFERENCES wish_claims(id),
+    applicant_id     BIGINT NOT NULL REFERENCES users(id),
+    reviewer_id      BIGINT NOT NULL DEFAULT 0,
+    current_deadline TIMESTAMPTZ,
+    new_deadline     TIMESTAMPTZ NOT NULL,
+    reason           TEXT NOT NULL,
+    status           VARCHAR(20) NOT NULL DEFAULT 'pending',
+    review_note      TEXT NOT NULL DEFAULT '',
+    reviewed_at      TIMESTAMPTZ,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_extensions_wish ON deadline_extensions(wish_id);
+CREATE INDEX IF NOT EXISTS idx_extensions_applicant ON deadline_extensions(applicant_id);
+CREATE INDEX IF NOT EXISTS idx_extensions_status ON deadline_extensions(status);
+-- 同一心愿同时只能有一条待审申请（并发兜底，与 service 行锁/条件更新对应）
+CREATE UNIQUE INDEX IF NOT EXISTS idx_extensions_pending_wish
+    ON deadline_extensions (wish_id) WHERE status = 'pending';

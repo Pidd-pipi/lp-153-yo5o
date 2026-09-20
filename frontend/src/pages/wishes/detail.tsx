@@ -8,6 +8,7 @@ import { claimApi } from "@/api/claim";
 import GiftPicker from "@/components/GiftPicker";
 import ProgressBar from "@/components/ProgressBar";
 import StatusBadge from "@/components/StatusBadge";
+import ExtensionPanel from "@/components/ExtensionPanel";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCategory, formatDate, formatDeadline, formatDifficulty } from "@/utils/format";
@@ -119,7 +120,7 @@ export default function WishDetailPage() {
   }
 
   const isOwner = isAuthed() && wish.user_id === user?.id;
-  const isFulfiller = Boolean(wish.claim);
+  const isFulfiller = isAuthed() && Boolean(wish.claim) && wish.claim?.user_id === user?.id;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -171,6 +172,19 @@ export default function WishDetailPage() {
             <ProgressBar progress={wish.claim.progress} label="圆梦进度" />
             {wish.claim.latest_note && <p className="mt-2 text-sm text-gray-600">{wish.claim.latest_note}</p>}
           </div>
+        )}
+
+        {wish.claim && (wish.extension || isOwner || isFulfiller) && (
+          <ExtensionPanel
+            wishId={wish.id}
+            currentUserId={user?.id}
+            ownerId={wish.user_id}
+            fulfillerId={wish.claim.user_id}
+            currentDeadline={wish.expected_deadline}
+            wishStatus={wish.status}
+            extension={wish.extension}
+            onChanged={() => load(id)}
+          />
         )}
 
         {isFulfiller && wish.status !== "completed" && (

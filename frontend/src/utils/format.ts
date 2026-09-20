@@ -4,6 +4,7 @@ import {
   DIFFICULTY_TEXT,
   CATEGORY_TEXT,
   CAPSULE_STATUS_TEXT,
+  EXTENSION_STATUS_TEXT,
   BADGE_TYPE_TEXT,
   ROLE_TEXT,
 } from "@/constants";
@@ -39,6 +40,10 @@ export function formatCategory(c: string) {
 
 export function formatCapsuleStatus(s: string) {
   return CAPSULE_STATUS_TEXT[s] || s;
+}
+
+export function formatExtensionStatus(s: string) {
+  return EXTENSION_STATUS_TEXT[s] || s;
 }
 
 export function formatBadgeType(t: string) {

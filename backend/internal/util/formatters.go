@@ -33,6 +33,9 @@ func FormatCategory(c string) string { return constants.CategoryText(c) }
 // FormatCapsuleStatus 胶囊状态文本（耦合 constants.CapsuleStatusText）。
 func FormatCapsuleStatus(s string) string { return constants.CapsuleStatusText(s) }
 
+// FormatExtensionStatus 延期申请状态文本（耦合 constants.ExtensionStatusText）。
+func FormatExtensionStatus(s string) string { return constants.ExtensionStatusText(s) }
+
 // FormatBadgeType 徽章类型文本（耦合 constants.BadgeTypeText）。
 func FormatBadgeType(t string) string { return constants.BadgeTypeText(t) }
 

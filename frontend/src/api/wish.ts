@@ -1,4 +1,7 @@
 import { http } from "@/utils/request";
+import type { DeadlineExtension } from "./extension";
+
+export type { DeadlineExtension } from "./extension";
 
 export interface Wish {
   id: number;
@@ -36,6 +39,7 @@ export interface ClaimSummary {
 
 export interface WishDetail extends Wish {
   claim?: ClaimSummary | null;
+  extension?: DeadlineExtension | null;
   blessing_count: number;
 }
 

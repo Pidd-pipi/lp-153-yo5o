@@ -87,9 +87,10 @@ func ToWishResponse(w *model.Wish) WishResponse {
 	return resp
 }
 
-// WishDetailResponse 心愿详情返回结构（含认领摘要与祝福数）。
+// WishDetailResponse 心愿详情返回结构（含认领摘要、最新延期申请与祝福数）。
 type WishDetailResponse struct {
 	WishResponse
-	Claim         *WishClaimResponse `json:"claim"`
-	BlessingCount int64              `json:"blessing_count"`
+	Claim         *WishClaimResponse         `json:"claim"`
+	Extension     *DeadlineExtensionResponse `json:"extension"`
+	BlessingCount int64                      `json:"blessing_count"`
 }
