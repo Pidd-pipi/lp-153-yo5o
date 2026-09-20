@@ -48,6 +48,25 @@ CREATE TABLE IF NOT EXISTS wish_claims (
 );
 CREATE INDEX IF NOT EXISTS idx_claims_user ON wish_claims(user_id);
 
+CREATE TABLE IF NOT EXISTS wish_extensions (
+    id            BIGSERIAL PRIMARY KEY,
+    wish_id       BIGINT NOT NULL REFERENCES wishes(id),
+    claim_id      BIGINT NOT NULL REFERENCES wish_claims(id),
+    user_id       BIGINT NOT NULL REFERENCES users(id),
+    old_deadline  TIMESTAMPTZ,
+    new_deadline  TIMESTAMPTZ NOT NULL,
+    reason        TEXT NOT NULL,
+    status        VARCHAR(20) NOT NULL DEFAULT 'pending',
+    reviewer_id   BIGINT NOT NULL DEFAULT 0,
+    reviewed_at   TIMESTAMPTZ,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_extensions_wish ON wish_extensions(wish_id);
+CREATE INDEX IF NOT EXISTS idx_extensions_user ON wish_extensions(user_id);
+-- 同一心愿仅允许一条待审申请（部分唯一索引兜底并发）
+CREATE UNIQUE INDEX IF NOT EXISTS uk_extension_pending_wish ON wish_extensions(wish_id) WHERE status = 'pending';
+
 CREATE TABLE IF NOT EXISTS blessings (
     id             BIGSERIAL PRIMARY KEY,
     wish_id        BIGINT NOT NULL REFERENCES wishes(id),

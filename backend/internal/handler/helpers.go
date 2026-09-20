@@ -48,17 +48,20 @@ func httpStatusOf(code int) int {
 	case code >= constants.CodeBadRequest:
 		return http.StatusBadRequest
 	}
-	// 业务错误码（1xxxx-8xxxx）：按实体错误码映射 HTTP 状态。
+	// 业务错误码（1xxxx-9xxxx）：按实体错误码映射 HTTP 状态。
 	switch {
-	case code == constants.CodeUserExists || code == constants.CodeWishAlreadyClaimed:
+	case code == constants.CodeUserExists || code == constants.CodeWishAlreadyClaimed ||
+		code == constants.CodeExtensionPendingExists || code == constants.CodeExtensionAlreadyProcessed:
 		return http.StatusConflict
 	case code == constants.CodeUserBanned || code == constants.CodeWishNotOwner ||
-		code == constants.CodeClaimNotOwner || code == constants.CodeAuditDenied:
+		code == constants.CodeClaimNotOwner || code == constants.CodeAuditDenied ||
+		code == constants.CodeExtensionNotFulfiller:
 		return http.StatusForbidden
 	case code == constants.CodeInvalidCredential:
 		return http.StatusUnauthorized
 	case code == constants.CodeUserNotFound || code == constants.CodeWishNotFound ||
-		code == constants.CodeClaimNotFound || code == constants.CodeCapsuleNotFound:
+		code == constants.CodeClaimNotFound || code == constants.CodeCapsuleNotFound ||
+		code == constants.CodeExtensionNotFound:
 		return http.StatusNotFound
 	default:
 		return http.StatusBadRequest

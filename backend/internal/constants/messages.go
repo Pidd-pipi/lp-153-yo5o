@@ -27,4 +27,12 @@ const (
 	MsgCapsuleLocked      = "时光胶囊尚未到解锁时间"
 	MsgParamInvalid       = "参数校验失败"
 	MsgInternalError      = "服务器内部错误"
+
+	MsgExtensionSubmitted        = "延期申请已提交，等待心愿发布者审核"
+	MsgExtensionApproved         = "已批准延期申请，心愿截止时间已更新"
+	MsgExtensionRejected         = "已驳回延期申请"
+	MsgExtensionNotFound         = "延期申请不存在"
+	MsgExtensionPendingExists    = "该心愿已存在待审核的延期申请"
+	MsgExtensionAlreadyProcessed = "该延期申请已被处理"
+	MsgExtensionNotFulfiller     = "只有圆梦人才能申请延期"
 )

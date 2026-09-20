@@ -39,6 +39,7 @@ func Open(cfg *config.Config, logger *slog.Logger) (*gorm.DB, error) {
 		&model.User{},
 		&model.Wish{},
 		&model.WishClaim{},
+		&model.WishExtension{},
 		&model.Blessing{},
 		&model.TimeCapsule{},
 		&model.Badge{},

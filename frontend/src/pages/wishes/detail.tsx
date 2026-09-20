@@ -5,12 +5,28 @@ import type { WishDetail } from "@/api/wish";
 import { wishApi } from "@/api/wish";
 import { blessingApi } from "@/api/blessing";
 import { claimApi } from "@/api/claim";
+import type { WishExtension } from "@/api/extension";
+import { extensionApi } from "@/api/extension";
 import GiftPicker from "@/components/GiftPicker";
 import ProgressBar from "@/components/ProgressBar";
 import StatusBadge from "@/components/StatusBadge";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/hooks/useAuth";
-import { formatCategory, formatDate, formatDeadline, formatDifficulty } from "@/utils/format";
+import { EXTENSION_STATUS_STYLE } from "@/constants";
+import { formatCategory, formatDate, formatDeadline, formatDifficulty, formatExtensionStatus } from "@/utils/format";
+
+// toDateInputValue 把 Date 格式化为 date 输入框的 YYYY-MM-DD。
+function toDateInputValue(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// addDaysToDateStr 在 YYYY-MM-DD 日期串上加减天数（避免时区偏移）。
+function addDaysToDateStr(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return "";
+  return toDateInputValue(new Date(y, m - 1, d + days));
+}
 
 export default function WishDetailPage() {
   const router = useRouter();
@@ -25,6 +41,9 @@ export default function WishDetailPage() {
   const [progress, setProgress] = useState(0);
   const [note, setNote] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [extensions, setExtensions] = useState<WishExtension[]>([]);
+  const [extDate, setExtDate] = useState("");
+  const [extReason, setExtReason] = useState("");
 
   const load = useCallback(async (wishId: number) => {
     if (!wishId) return;
@@ -35,6 +54,8 @@ export default function WishDetailPage() {
       if (detail.claim) setProgress(detail.claim.progress);
       const bl = await blessingApi.list(wishId, { page: 1, page_size: 50 });
       setBlessings(bl.items);
+      const exts = await extensionApi.listByWish(wishId);
+      setExtensions(exts);
     } catch (e) {
       toast.show((e as Error).message, "error");
     } finally {
@@ -114,12 +135,57 @@ export default function WishDetailPage() {
     }
   };
 
+  const submitExtension = async () => {
+    if (!extDate) {
+      toast.show("请选择新的完成日期", "error");
+      return;
+    }
+    if (extReason.trim().length < 2) {
+      toast.show("请填写延期原因", "error");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await extensionApi.submit(id, { new_deadline: `${extDate}T23:59:59+08:00`, reason: extReason.trim() });
+      toast.show("延期申请已提交，等待心愿发布者审核 ⏳");
+      setExtDate("");
+      setExtReason("");
+      load(id);
+    } catch (e) {
+      toast.show((e as Error).message, "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const reviewExtension = async (extensionId: number, action: "approve" | "reject") => {
+    setActionLoading(true);
+    try {
+      await extensionApi.review(extensionId, action);
+      toast.show(action === "approve" ? "已批准延期，心愿截止时间已更新 ✅" : "已驳回延期申请");
+      load(id);
+    } catch (e) {
+      toast.show((e as Error).message, "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading || !wish) {
     return <p className="py-16 text-center text-gray-400">加载中...</p>;
   }
 
   const isOwner = isAuthed() && wish.user_id === user?.id;
   const isFulfiller = Boolean(wish.claim);
+  const isClaimOwner = isAuthed() && Boolean(wish.claim) && wish.claim?.user_id === user?.id;
+  const pendingExt = extensions.find((e) => e.status === "pending");
+  const deadlinePassed = Boolean(wish.expected_deadline) && new Date(`${wish.expected_deadline}T23:59:59`) < new Date();
+  const canSubmitExtension = isClaimOwner && wish.status !== "completed" && !pendingExt && Boolean(wish.expected_deadline) && !deadlinePassed;
+  const minExtDate = wish.expected_deadline ? addDaysToDateStr(wish.expected_deadline, 1) : "";
+  const maxExtDate = (() => {
+    const now = new Date();
+    return toDateInputValue(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 90));
+  })();
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -195,6 +261,57 @@ export default function WishDetailPage() {
           </button>
         )}
       </div>
+
+      {(wish.claim || extensions.length > 0) && (
+        <div className="card space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">⏳</span>
+            <h2 className="text-lg font-semibold text-gray-800">延期申请</h2>
+            {pendingExt && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">待审核</span>}
+          </div>
+
+          {extensions.length === 0 && <p className="py-2 text-center text-sm text-gray-400">还没有延期申请</p>}
+
+          <div className="space-y-3">
+            {extensions.map((ext) => (
+              <div key={ext.id} className="rounded-xl bg-purple-50/60 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-gray-700">
+                    {ext.fulfiller_name || `#${ext.user_id}`} 申请延期至 {ext.new_deadline}
+                  </p>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${EXTENSION_STATUS_STYLE[ext.status] || "bg-gray-100 text-gray-600"}`}>
+                    {formatExtensionStatus(ext.status)}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  原截止 {ext.old_deadline || "不限时"} → 新截止 {ext.new_deadline} · 提交于 {formatDate(ext.created_at)}
+                </p>
+                <p className="mt-1 text-sm text-gray-600">原因：{ext.reason}</p>
+                {ext.reviewed_at && (
+                  <p className="mt-1 text-xs text-gray-400">
+                    {formatExtensionStatus(ext.status)} by {ext.reviewer_name || `#${ext.reviewer_id}`} · {formatDate(ext.reviewed_at)}
+                  </p>
+                )}
+                {isOwner && ext.status === "pending" && (
+                  <div className="mt-2 flex gap-2">
+                    <button className="btn-primary !px-3 !py-1 text-sm" disabled={actionLoading} onClick={() => reviewExtension(ext.id, "approve")}>批准 ✓</button>
+                    <button className="btn-secondary !px-3 !py-1 text-sm" disabled={actionLoading} onClick={() => reviewExtension(ext.id, "reject")}>驳回 ✗</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {canSubmitExtension && (
+            <div className="space-y-2 border-t border-purple-50 pt-3">
+              <p className="text-sm font-medium text-gray-700">申请延期（新日期须晚于当前截止，且不超过今天起 90 天）</p>
+              <input type="date" className="input" value={extDate} min={minExtDate} max={maxExtDate} onChange={(e) => setExtDate(e.target.value)} />
+              <textarea className="input min-h-[60px]" value={extReason} onChange={(e) => setExtReason(e.target.value)} placeholder="说明延期原因..." />
+              <button className="btn-primary" disabled={actionLoading} onClick={submitExtension}>提交延期申请</button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="card space-y-4">
         <div className="flex items-center gap-2">

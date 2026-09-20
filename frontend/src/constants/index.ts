@@ -76,6 +76,22 @@ export const CAPSULE_STATUS_TEXT: Record<string, string> = {
   unlocked: "已解锁",
 };
 
+export const EXTENSION_STATUS = {
+  PENDING: "pending",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+} as const;
+export const EXTENSION_STATUS_TEXT: Record<string, string> = {
+  pending: "待审核",
+  approved: "已批准",
+  rejected: "已驳回",
+};
+export const EXTENSION_STATUS_STYLE: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-700",
+  approved: "bg-emerald-100 text-emerald-700",
+  rejected: "bg-rose-100 text-rose-700",
+};
+
 export const BADGE_TYPE = {
   FIRST_WISH: "first_wish",
   FIRST_CLAIM: "first_claim",

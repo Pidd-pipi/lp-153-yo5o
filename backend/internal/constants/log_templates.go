@@ -38,4 +38,7 @@ const (
 	LogCapsuleCreateFail  = "time capsule creation failed"
 	LogSeedAdminCreated   = "default admin seeded"
 	LogUploadDenied       = "file upload denied by size or type"
+	LogExtensionSubmitted = "wish extension submitted"
+	LogExtensionApproved  = "wish extension approved"
+	LogExtensionRejected  = "wish extension rejected"
 )

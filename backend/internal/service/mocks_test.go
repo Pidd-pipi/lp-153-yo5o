@@ -124,6 +124,35 @@ func (m *mockClaimRepo) ListByUserID(userID uint64, offset, limit int) ([]model.
 func (m *mockClaimRepo) CountByUserID(userID uint64) (int64, error) { return m.countByUserFn(userID) }
 func (m *mockClaimRepo) ListByWishIDs(wishIDs []uint64) ([]model.WishClaim, error) { return m.listByWishFn(wishIDs) }
 
+// ---- mock WishExtensionRepository ----
+type mockExtensionRepo struct {
+	createWithTxFn      func(tx *gorm.DB, ext *model.WishExtension) error
+	findByIDFn          func(id uint64) (*model.WishExtension, error)
+	findByIDForUpdateFn func(tx *gorm.DB, id uint64) (*model.WishExtension, error)
+	findPendingByWishFn func(wishID uint64) (*model.WishExtension, error)
+	updateWithTxFn      func(tx *gorm.DB, ext *model.WishExtension) error
+	listByWishFn        func(wishID uint64) ([]model.WishExtension, error)
+}
+
+func (m *mockExtensionRepo) CreateWithTx(tx *gorm.DB, ext *model.WishExtension) error {
+	return m.createWithTxFn(tx, ext)
+}
+func (m *mockExtensionRepo) FindByID(id uint64) (*model.WishExtension, error) {
+	return m.findByIDFn(id)
+}
+func (m *mockExtensionRepo) FindByIDForUpdate(tx *gorm.DB, id uint64) (*model.WishExtension, error) {
+	return m.findByIDForUpdateFn(tx, id)
+}
+func (m *mockExtensionRepo) FindPendingByWishID(wishID uint64) (*model.WishExtension, error) {
+	return m.findPendingByWishFn(wishID)
+}
+func (m *mockExtensionRepo) UpdateWithTx(tx *gorm.DB, ext *model.WishExtension) error {
+	return m.updateWithTxFn(tx, ext)
+}
+func (m *mockExtensionRepo) ListByWishID(wishID uint64) ([]model.WishExtension, error) {
+	return m.listByWishFn(wishID)
+}
+
 // ---- mock BlessingRepository ----
 type mockBlessRepo struct {
 	createFn       func(blessing *model.Blessing) error

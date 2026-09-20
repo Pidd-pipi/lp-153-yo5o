@@ -30,10 +30,11 @@ docker compose down -v --remove-orphans
 
 1. **心愿发布**：文字 + 图片，分类（学习成长/旅行探险/情感陪伴/职业发展/生活小确幸/其他），可见范围（公开/好友可见/匿名），期望完成时间 + 难度标签。
 2. **心愿认领与进度追踪**：心愿广场浏览并认领心愿成为「圆梦人」，更新进度（百分比 + 文字），支持里程碑打卡。
-3. **祝福留言板**：每个心愿专属留言板，送祝福与虚拟礼物（🎁 表情包）；心愿完成自动转为庆祝页。
-4. **时光胶囊**：定时解锁的文字 + 图片 + 音频胶囊；解锁前内容打码，到期自动解锁并播放解锁动画。
-5. **心愿成就徽章**：首次许愿、首次认领、首次祝福、十次圆梦、圆梦大师；展示在个人主页。
-6. **搜索与发现广场**：按标签/关键词搜索，热门圆梦人排行榜 + 最新完成的心愿故事。
+3. **延期申请闭环**：圆梦人可在截止前提交新完成日期与延期原因（同一心愿仅一条待审，新日期须晚于当前截止且不超过提交日起 90 天）；仅心愿发布者可批准/驳回，批准时申请状态与心愿截止时间同事务更新，驳回后可重新提交；详情页展示申请、原因与处理结果。
+4. **祝福留言板**：每个心愿专属留言板，送祝福与虚拟礼物（🎁 表情包）；心愿完成自动转为庆祝页。
+5. **时光胶囊**：定时解锁的文字 + 图片 + 音频胶囊；解锁前内容打码，到期自动解锁并播放解锁动画。
+6. **心愿成就徽章**：首次许愿、首次认领、首次祝福、十次圆梦、圆梦大师；展示在个人主页。
+7. **搜索与发现广场**：按标签/关键词搜索，热门圆梦人排行榜 + 最新完成的心愿故事。
 
 ## 技术栈
 
@@ -58,7 +59,7 @@ lp-153/
 │   ├── internal/
 │   │   ├── config/                 # 环境变量配置
 │   │   ├── database/               # PostgreSQL / Redis / MinIO 连接
-│   │   ├── model/                  # 7 个实体（user/wish/claim/blessing/capsule/badge/audit）
+│   │   ├── model/                  # 8 个实体（user/wish/claim/extension/blessing/capsule/badge/audit）
 │   │   ├── dto/                    # 每个实体一个 DTO 文件（含 validator 校验）
 │   │   ├── repository/             # 每个实体一个仓储文件（哨兵错误）
 │   │   ├── service/                # 每个实体一个服务文件（事务/状态机）
@@ -167,7 +168,25 @@ curl -sS -X POST http://localhost:19403/api/v1/wishes/1/blessings \
   -d '{"content":"祝你梦想成真！","gift_emoji":"🎁"}'
 ```
 
-### 8. 封存时光胶囊
+### 8. 提交延期申请（圆梦人）
+
+```bash
+curl -sS -X POST http://localhost:19403/api/v1/wishes/1/extensions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"new_deadline":"2026-12-31T23:59:59+08:00","reason":"行程冲突，需要更多时间筹备"}'
+```
+
+### 9. 审核延期申请（心愿发布者，action 为 approve 或 reject）
+
+```bash
+curl -sS -X POST http://localhost:19403/api/v1/extensions/1/review \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"action":"approve"}'
+```
+
+### 10. 封存时光胶囊
 
 ```bash
 curl -sS -X POST http://localhost:19403/api/v1/capsules \
@@ -210,6 +229,14 @@ curl -sS -X POST http://localhost:19403/api/v1/capsules \
 | GET | `/claims/mine` | 我认领的心愿 | JWT |
 | PUT | `/claims/:id/progress` | 更新进度（里程碑打卡） | JWT |
 | POST | `/claims/:id/complete` | 标记完成 | JWT |
+
+### 延期申请
+
+| 方法 | 路径 | 说明 | 鉴权 |
+| --- | --- | --- | --- |
+| POST | `/wishes/:id/extensions` | 圆梦人提交延期申请（事务 + 行锁，同一心愿仅一条待审；新日期须晚于当前截止且 ≤ 提交日起 90 天） | JWT |
+| GET | `/wishes/:id/extensions` | 心愿的延期申请列表（详情页回读，复用 `WishExtensionService.ListByWish`） | 公开 |
+| POST | `/extensions/:id/review` | 心愿发布者批准/驳回（事务 + 行锁，批准时申请状态与心愿截止时间同时更新，并发只成功一次） | JWT |
 
 ### 祝福留言板
 
@@ -327,6 +354,22 @@ curl -sS -X POST http://localhost:19403/api/v1/capsules \
 | 后端 formatters | `backend/internal/util/formatters.go`（`FormatBadgeType`） |
 | 前端 constants | `frontend/src/constants/index.ts`（`BADGE_TYPE`/`BADGE_TYPE_TEXT`） |
 | 前端页面 | `frontend/src/pages/profile.tsx`（徽章展示） |
+
+### 枚举 7：延期申请状态（pending / approved / rejected）
+
+| 层 | 位置 |
+| --- | --- |
+| 后端 constants | `backend/internal/constants/extension_status.go`（含 `MaxExtensionDays=90` 与审核动作 approve/reject） |
+| 后端模型 | `backend/internal/model/wish_extension.go`（Status 字段，wish_id 部分唯一索引兜底待审唯一） |
+| 后端 DTO | `backend/internal/dto/wish_extension_dto.go`（Create/Review/Response） |
+| 后端状态机 | `backend/internal/service/wish_extension_service.go`（Submit/Review 流转） |
+| 后端仓储 | `backend/internal/repository/wish_extension_repository.go`（`FindPendingByWishID`/`FindByIDForUpdate`） |
+| 后端 handler 校验 | `backend/internal/handler/wish_extension_handler.go`（validator oneof） |
+| 后端日志模板 | `backend/internal/constants/log_templates.go`（`LogExtensionSubmitted`/`LogExtensionApproved`/`LogExtensionRejected`） |
+| 后端错误码 | `backend/internal/constants/error_codes.go`（`CodeExtensionNotFound`/`CodeExtensionPendingExists`/`CodeExtensionNotFulfiller`/`CodeExtensionAlreadyProcessed`/`CodeExtensionInvalidDate`） |
+| 后端 formatters | `backend/internal/util/formatters.go`（`FormatExtensionStatus`） |
+| 前端 constants | `frontend/src/constants/index.ts`（`EXTENSION_STATUS`/`EXTENSION_STATUS_TEXT`/`EXTENSION_STATUS_STYLE`） |
+| 前端页面 | `frontend/src/pages/wishes/detail.tsx`（延期申请区：提交表单、状态徽标、批准/驳回按钮） |
 
 ## 屎山代码设计说明（跨文件协同约束）
 

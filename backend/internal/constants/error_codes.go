@@ -30,4 +30,10 @@ const (
 	CodeAuditDenied        = 70001
 	CodeUploadFailed       = 80001
 	CodeFileTypeNotAllowed = 80002
+
+	CodeExtensionNotFound         = 90001
+	CodeExtensionPendingExists    = 90002
+	CodeExtensionNotFulfiller     = 90003
+	CodeExtensionAlreadyProcessed = 90004
+	CodeExtensionInvalidDate      = 90005
 )
